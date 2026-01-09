@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Chatbot</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Roboto', sans-serif;
+    overflow: hidden;
+    background: #000;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.messages {
+    flex: 1;
+    overflow-y: auto;  
+}
+
+.messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 10px;
+}
+
+.messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+
+/* ===================== */
+/* CHAT CONTAINER        */
+/* ===================== */
+
+.chat-container {
+    width: 100%;
+    max-width: 420px;
+    height: 90vh;
+    background: #121212;
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 25px rgba(0,0,0,.9);
+    overflow: hidden;
+}
+
+/* ===================== */
+/* HEADER                */
+/* ===================== */
+
+.header {
+    padding: 14px;
+    text-align: center;
+    font-weight: bold;
+    color: #4fc3f7;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+/* ===================== */
+/* MESSAGES               */
+/* ===================== */
+
+.messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+}
+
+/* ===================== */
+/* BUBBLES                */
+/* ===================== */
+
+.bubble {
+    padding: 12px 16px;
+    border-radius: 18px;
+    max-width: 80%;
+    font-size: 14px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.user {
+    background: #2d7d46;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.bot {
+    background: #1e1e1e;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+
+.bot ul {
+    padding-left: 18px;
+}
+
+.bot li {
+    margin-bottom: 6px;
+}
+
+/* ===================== */
+/* INPUT AREA             */
+/* ===================== */
+
+.input-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+}
+
+/* FILE BUTTON */
+
+.file-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #4fc3f7;
+    color: #000;
+    font-size: 26px;
+    font-weight: bold;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+/* TEXT INPUT */
+
+input[type="text"] {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 20px;
+    border: none;
+    background: #2a2a2a;
+    color: #fff;
+    font-size: 14px;
+}
+
+/* SEND BUTTON */
+
+.send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: #4fc3f7;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+/* SUMMARY BUTTON */
+
+.summary-btn {
+    padding: 10px 14px;
+    border-radius: 20px;
+    border: none;
+    background: #4fc3f7;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* HOME BUTTON */
+
+.home-btn {
+    text-align: center;
+    padding: 10px;
+    background: #222;
+    color: #fff;
+    border-radius: 14px;
+    text-decoration: none;
+    font-size: 14px;
+    margin: 6px;
+}
+
+/* ===================== */
+/* 📱 MOBILE RESPONSIVE  */
+/* ===================== */
+
+@media (max-width: 600px) {
+
+    body {
+        align-items: flex-start;
+    }
+
+    .chat-container {
+        height: 100vh;
+        max-width: 100%;
+        border-radius: 0;
+    }
+
+    .messages {
+        padding: 10px;
+        font-size: 13px;
+    }
+
+    .bubble {
+        max-width: 90%;
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+
+    .input-area {
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .file-btn,
+    .send-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 22px;
+    }
+
+    input[type="text"] {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+
+    .summary-btn {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="chat-container">
+
+    <div class="header">DocuBot</div>
+
+    <div class="messages" id="messages">
+
+        {% with messages = get_flashed_messages() %}
+            {% for msg in messages %}
+                <div class="bubble bot">{{ msg }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        {% if answer %}
+            <div class="bubble user">your answer</div>
+            <div class="bubble bot">
+                <ul>
+                    {% for line in answer.split('\n') %}
+                        <li>{{ line }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {% if summary %}
+            <div class="bubble bot">
+                <strong>📌 Summary</strong>
+                <ul>
+                    {% for line in summary.split('\n') %}
+                        <li>{{ line }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <div class="input-area">
+
+        <!-- PDF Upload -->
+        <form method="POST" enctype="multipart/form-data" id="pdfForm">
+            <input type="file" name="pdf" id="pdfInput" accept="application/pdf"
+                   onchange="document.getElementById('pdfForm').submit()">
+            <label class="file-btn" for="pdfInput">+</label>
+        </form>
+
+        <!-- Question -->
+        <form method="POST" style="flex:1; display:flex; gap:6px;">
+            <input type="text" name="question" placeholder="Ask question from PDF" required>
+            <button type="submit" class="send-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#000" viewBox="0 0 24 24">
+                    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+                </svg>
+            </button>
+        </form>
+
+        <!-- Summary -->
+        <form method="POST">
+            <button type="submit" name="summary" value="true" class="summary-btn">Summary</button>
+        </form>
+
+    </div>
+
+    <a href="{{ url_for('chat') }}" class="home-btn">⬅ Back to Chatbot</a>
+
+</div>
+
+<script>
+const messages = document.getElementById("messages");
+function scrollBottom(){
+    messages.scrollTop = messages.scrollHeight;
+}
+scrollBottom();
+window.addEventListener("resize", scrollBottom);
+</script>
+
+</body>
+</html>

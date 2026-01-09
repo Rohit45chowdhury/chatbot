@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Chatbot</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: 'Roboto', sans-serif;
+    background-color: #050505;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* Scrollbar */
+.messages::-webkit-scrollbar {
+    width: 6px;
+}
+.messages::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 10px;
+}
+.messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ================= */
+/* Chat Container    */
+/* ================= */
+
+.chat-container {
+    width: 400px;
+    min-height: 600px;
+    max-height: 90vh;
+    background-color: #121212;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 25px rgba(0,0,0,0.9);
+}
+
+/* ================= */
+/* Header            */
+/* ================= */
+
+.header {
+    background-color: #1a1a1a;
+    padding: 15px;
+    color: #fff;
+    font-weight: bold;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.header img {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+}
+
+/* ================= */
+/* Messages          */
+/* ================= */
+
+.messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bubble {
+    padding: 12px 18px;
+    border-radius: 20px;
+    max-width: 85%;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.user {
+    background-color: #2d7d46;
+    color: #fff;
+    align-self: flex-end;
+    border-bottom-right-radius: 0;
+}
+
+.bot {
+    background-color: #1e1e1e;
+    color: #eaeaea;
+    align-self: flex-start;
+    border-bottom-left-radius: 0;
+}
+
+.bot ul {
+    padding-left: 18px;
+    margin: 5px 0;
+}
+
+/* ================= */
+/* Special Boxes     */
+/* ================= */
+
+.weather-box,
+.currency-box,
+.error-box {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.currency-box { color: #c7a6ff; }
+.error-box { color: #ff6b6b; }
+
+.generated-image {
+    max-width: 100%;
+    border-radius: 12px;
+    margin-top: 8px;
+}
+
+.download-btn {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 6px 12px;
+    background: #222;
+    border: 1px solid #333;
+    color: #fff;
+    font-size: 13px;
+    border-radius: 12px;
+    text-decoration: none;
+}
+
+/* ================= */
+/* Loader            */
+/* ================= */
+
+.loader {
+    width: 28px;
+    height: 28px;
+    border: 4px solid #2a2a2a;
+    border-top: 4px solid #6f42c1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 10px auto;
+}
+
+.hidden {
+    display: none;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ================= */
+/* Input Box         */
+/* ================= */
+
+.input-box {
+    background-color: #1a1a1a;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-top: 1px solid #2a2a2a;
+}
+
+.input-row {
+    display: flex;
+    gap: 10px;
+}
+
+.input-box input {
+    flex: 1;
+    padding: 12px 15px;
+    border-radius: 20px;
+    border: none;
+    outline: none;
+    background: #222;
+    color: #fff;
+}
+
+.send-btn {
+    padding: 12px 18px;
+    border: none;
+    background-color: #6f42c1;
+    color: #fff;
+    font-weight: bold;
+    border-radius: 20px;
+    cursor: pointer;
+}
+
+.send-btn:hover {
+    background-color: #59339d;
+}
+
+.go-pdf-btn {
+    text-align: center;
+    padding: 10px;
+    background-color: #222;
+    color: #fff;
+    font-weight: bold;
+    border-radius: 20px;
+    text-decoration: none;
+    border: 1px solid #333;
+}
+
+/* ================= */
+/* 📱 Mobile Fix     */
+/* ================= */
+
+@media (max-width: 600px) {
+
+    body {
+        align-items: flex-start;
+    }
+
+    .chat-container {
+        width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .messages {
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    .bubble {
+        max-width: 90%;
+        padding: 10px 14px;
+    }
+
+    .input-box input,
+    .send-btn {
+        font-size: 14px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="chat-container">
+
+    <div class="header">
+        <img src="https://img.freepik.com/premium-photo/friendly-looking-ai-agent-as-logo-white-background-style-raw-job-id-ef2c5ef7e19b4dadbef969fcb37e_343960-69677.jpg">
+        AI Chatbot
+    </div>
+
+    <div class="messages" id="messages">
+
+        <!-- Loader -->
+        <div id="loader" class="loader hidden"></div>
+
+        {% for msg in history %}
+            {% if msg.role == "user" %}
+                <div class="bubble user">{{ msg.message }}</div>
+            {% else %}
+                <div class="bubble bot">
+
+                    {% if msg.type == "weather" %}
+                        <div class="weather-box">
+                            Temp🌡 {{ msg.temp }} °C<br>
+                            Humidity💧 {{ msg.humidity }}%<br>
+                            wind 🌬 {{ msg.wind }} km/h<br>
+                            
+                        </div>
+
+                    {% elif msg.type == "currency" %}
+                        <div class="currency-box">
+                            💱 {{ msg.amount }} {{ msg.from }} → {{ msg.to }}<br>
+                            📈 Rate: {{ msg.rate }}<br>
+                            ✅ Result: {{ msg.result }}
+                        </div>
+
+                    {% elif msg.type == "image" %}
+                        <img src="{{ msg.url }}" class="generated-image">
+                        <a href="{{ msg.url }}" download class="download-btn">⬇ Download Image</a>
+
+                    {% elif msg.type == "error" %}
+                        <div class="error-box">{{ msg.message }}</div>
+
+                    {% else %}
+                        <ul>
+                            {% for line in msg.message.split('\n') %}
+                                <li>{{ line }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <form method="POST" class="input-box" onsubmit="showTyping()">
+    <div class="input-row">
+        <input
+            type="text"
+            name="prompt"
+            placeholder="Type your message..."
+            required
+            autocomplete="off"
+        >
+        <button type="submit" class="send-btn">Send</button>
+    </div>
+  </form>
+
+  <!-- 🔹 MOVE LINK OUTSIDE FORM -->
+  <a href="{{ url_for('pdf_page') }}" class="go-pdf-btn">Go to DocuBot</a>
+
+
+</div>
+
+<script>
+const messages = document.getElementById("messages");
+const loader = document.getElementById("loader");
+const form = document.querySelector("form");
+
+function scrollBottom() {
+    messages.scrollTop = messages.scrollHeight;
+}
+
+scrollBottom();
+window.addEventListener("resize", scrollBottom);
+
+// Show loader when message is sent
+form.addEventListener("submit", () => {
+    loader.classList.remove("hidden");
+    scrollBottom();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+}
+
+nav a {
+    margin: 0 10px;
+    text-decoration: none;
+}
+
+.content {
+    margin-top: 20px;
+}
+
+input[type="text"], input[type="file"] {
+    padding: 8px;
+    margin-right: 10px;
+    width: 300px;
+}
+
+button {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.flash.success {
+    color: green;
+}
+
+.flash.warning {
+    color: orange;
+}
+
+.answer, .response, .summary, .chat-response {
+    margin-top: 15px;
+    padding: 10px;
+    border: 1px solid #ccc;
+}

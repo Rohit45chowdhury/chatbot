@@ -48,7 +48,8 @@ body {
 .chat-container {
     width: 100%;
     max-width: 420px;
-    height: 90vh;
+    min-height: 500px;    /* Reduced min height for desktop */
+    max-height: 80vh;     /* Never exceeds 80% of viewport height */
     background: #121212;
     border-radius: 18px;
     display: flex;
@@ -207,6 +208,13 @@ input[type="text"] {
 /* ===================== */
 
 @media (max-width: 600px) {
+  
+    .chat-container {
+        width: 95%;          /* Almost full width */
+        min-height: 400px;   /* Smaller min height for mobile */
+        max-height: 90vh;    /* Prevent overflow */
+        border-radius: 12px;
+    }
 
     body {
         align-items: flex-start;
@@ -250,6 +258,8 @@ input[type="text"] {
         font-size: 13px;
         padding: 8px 12px;
     }
+
+
 }
 </style>
 </head>

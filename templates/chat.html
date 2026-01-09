@@ -39,8 +39,8 @@ body {
 
 .chat-container {
     width: 400px;
-    min-height: 600px;
-    max-height: 90vh;
+    min-height: 500px;  /* Reduced from 600px */
+    max-height: 80vh;   /* Slightly smaller than 90vh */
     background-color: #121212;
     border-radius: 15px;
     display: flex;
@@ -234,10 +234,10 @@ body {
     }
 
     .chat-container {
-        width: 100%;
-        height: 100vh;
-        max-height: 100vh;
-        border-radius: 0;
+        width: 95%;        /* almost full width */
+        min-height: 400px; /* smaller min-height */
+        max-height: 90vh;  /* prevent overflow */
+        border-radius: 12px;
     }
 
     .messages {
@@ -283,7 +283,6 @@ body {
                             Temp🌡 {{ msg.temp }} °C<br>
                             Humidity💧 {{ msg.humidity }}%<br>
                             wind 🌬 {{ msg.wind }} km/h<br>
-                            
                         </div>
 
                     {% elif msg.type == "currency" %}
@@ -328,7 +327,6 @@ body {
 
   <!-- 🔹 MOVE LINK OUTSIDE FORM -->
   <a href="{{ url_for('pdf_page') }}" class="go-pdf-btn">Go to DocuBot</a>
-
 
 </div>
 

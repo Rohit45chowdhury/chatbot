@@ -3,23 +3,32 @@ from io import BytesIO
 from flask import Flask, render_template, request, flash, url_for, session, redirect
 from dotenv import load_dotenv
 from PIL import Image
-from youtube_transcript_api import YouTubeTranscriptApi
-from google import genai
+from werkzeug.utils import secure_filename
+import google.genai as genai
 
-# RAG
+# =======================
+# RAG IMPORTS
+# =======================
 from rag_pipeline import (
-    answer_query, retrieve_docs, summarize_pdf,
-    llm_model, retrieve_all_docs
+    answer_query,
+    retrieve_docs,
+    summarize_pdf,
+    llm_model,
+    retrieve_all_docs
 )
+
 from vector_database import (
-    upload_pdf, load_pdf, create_chunks,
-    build_faiss_db, reset_faiss_db
+    load_pdf,
+    create_chunks,
+    build_faiss_db,
+    reset_faiss_db
 )
 
 # =======================
 # ENV SETUP
 # =======================
 load_dotenv()
+
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 CURRENCY_API_KEY = os.getenv("CURRENCY_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -31,99 +40,92 @@ GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", "supersecret")
 
+UPLOAD_FOLDER = "uploads"
+STATIC_FOLDER = "static"
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(STATIC_FOLDER, exist_ok=True)
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
+
+# =======================
+# GEMINI CLIENT
+# =======================
 client = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_ID = "gemini-3-flash-preview"
 
-index_ready = False
-
-# =======================
-# GEMINI
-# =======================
 def gemini_qa(prompt):
     try:
         res = client.models.generate_content(
             model=MODEL_ID,
-            contents=prompt
+            contents=prompt.strip()
         )
         return res.text.strip()
     except Exception as e:
         return f"❌ Gemini Error: {e}"
 
 # =======================
-# TOOLS
+# AI TOOLS
 # =======================
 def weather_tool(city):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
-    w = requests.get(url).json()
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
+        w = requests.get(url, timeout=10).json()
 
-    if w.get("cod") != 200:
-        return {"type": "error", "message": "❌ City not found"}
+        if w.get("cod") != 200:
+            return {"type": "error", "message": "City not found"}
 
-    lat, lon = w["coord"]["lat"], w["coord"]["lon"]
-    aqi_url = f"https://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={WEATHER_API_KEY}"
-    aqi_data = requests.get(aqi_url).json()
-    aqi = aqi_data["list"][0]["main"]["aqi"]
+        return {
+            "type": "weather",
+            "city": city.title(),
+            "temp": w["main"]["temp"],
+            "humidity": w["main"]["humidity"],
+            "wind": w["wind"]["speed"],
+            "desc": w["weather"][0]["description"]
+        }
+    except Exception as e:
+        return {"type": "error", "message": str(e)}
 
-    return {
-        "type": "weather",
-        "city": city.title(),
-        "temp": w["main"]["temp"],
-        "humidity": w["main"]["humidity"],
-        "wind": w["wind"]["speed"],
-        "aqi": aqi,
-        "desc": w["weather"][0]["description"]
-    }
-
+# =======================
+# FIXED CURRENCY
+# =======================
 def parse_currency(prompt):
-    match = re.search(
-        r"convert\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]{3})\s+to\s+([a-zA-Z]{3})",
-        prompt.lower()
-    )
-    return match.groups() if match else None
+    pattern = r"(\d+(?:\.\d+)?)\s*(usd|inr|eur|gbp|jpy|aud|cad)\s*(?:to|in)\s*(usd|inr|eur|gbp|jpy|aud|cad)"
+    m = re.search(pattern, prompt.lower())
+    if m:
+        amt, f, t = m.groups()
+        return float(amt), f.upper(), t.upper()
+    return None
 
 def currency_tool(amount, f, t):
-    url = f"https://v6.exchangerate-api.com/v6/{CURRENCY_API_KEY}/pair/{f}/{t}/{amount}"
-    r = requests.get(url).json()
+    try:
+        url = f"https://v6.exchangerate-api.com/v6/{CURRENCY_API_KEY}/pair/{f}/{t}/{amount}"
+        r = requests.get(url, timeout=10).json()
+        if r.get("result") != "success":
+            raise Exception("Conversion failed")
 
-    if r.get("result") != "success":
-        return {"type": "error", "message": "❌ Currency conversion failed"}
-
-    return {
-        "type": "currency",
-        "amount": amount,
-        "from": f,
-        "to": t,
-        "rate": r["conversion_rate"],
-        "result": round(r["conversion_result"], 2)
-    }
+        return {
+            "type": "currency",
+            "amount": amount,
+            "from_currency": f,
+            "to_currency": t,
+            "result": round(r["conversion_result"], 2)
+        }
+    except Exception as e:
+        return {"type": "error", "message": str(e)}
 
 def image_tool(prompt):
     try:
         url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-
         r = requests.post(url, headers=headers, json={"inputs": prompt}, timeout=60)
-        if r.status_code == 200:
-            img = Image.open(BytesIO(r.content))
-            filename = f"generated_{int(time.time())}.png"
-            path = f"static/{filename}"
-            img.save(path)
-            return {"type": "image", "url": url_for("static", filename=filename)}
-        return {"type": "error", "message": "❌ Image generation failed"}
 
-    except Exception as e:
-        return {"type": "error", "message": str(e)}
+        img = Image.open(BytesIO(r.content))
+        fname = f"gen_{int(time.time())}.png"
+        img.save(os.path.join(STATIC_FOLDER, fname))
 
-def youtube_tool(link):
-    try:
-        vid = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", link)
-        if not vid:
-            return {"type": "error", "message": "❌ Invalid YouTube link"}
-
-        transcript = YouTubeTranscriptApi.get_transcript(vid.group(1))
-        text = " ".join(i["text"] for i in transcript)
-        return {"type": "text", "message": gemini_qa("Summarize this transcript in bullet points:\n" + text)}
-
+        return {"type": "image", "url": url_for("static", filename=fname)}
     except Exception as e:
         return {"type": "error", "message": str(e)}
 
@@ -134,19 +136,14 @@ def ai_agent(prompt):
     p = prompt.lower()
 
     if "weather" in p:
-        city = p.split("in")[-1].strip()
-        return weather_tool(city)
+        return weather_tool(p.split("in")[-1].strip())
 
-    currency_data = parse_currency(prompt)
-    if currency_data:
-        amount, f, t = currency_data
-        return currency_tool(float(amount), f.upper(), t.upper())
+    cur = parse_currency(prompt)
+    if cur:
+        return currency_tool(*cur)
 
     if any(k in p for k in ["image", "draw", "generate image"]):
         return image_tool(prompt)
-
-    if any(k in p for k in ["youtube", "video"]):
-        return youtube_tool(prompt)
 
     return {"type": "text", "message": gemini_qa(prompt)}
 
@@ -155,92 +152,75 @@ def ai_agent(prompt):
 # =======================
 @app.route("/", methods=["GET", "POST"])
 def chat():
-    if "history" not in session:
-        session["history"] = []
+    session.setdefault("history", [])
 
     if request.method == "POST":
-        prompt = request.form.get("prompt")
-        if prompt:
-            session["history"].append({
-                "role": "user",
-                "type": "text",
-                "message": prompt
-            })
+        prompt = request.form.get("prompt", "").strip()
+        if not prompt:
+            flash("Enter message")
+            return redirect(url_for("chat"))
 
-            result = ai_agent(prompt)
-            result["role"] = "bot"
-            session["history"].append(result)
-
-            session.modified = True
-
+        session["history"].append({"role": "user", "message": prompt})
+        session["history"].append({"role": "bot", **ai_agent(prompt)})
+        session.modified = True
         return redirect(url_for("chat"))
 
     return render_template("chat.html", history=session["history"])
 
-
 @app.route("/pdf", methods=["GET", "POST"])
 def pdf_page():
-    global index_ready
-    answer, summary = None, None
+    answer = summary = question = None
+    session.setdefault("pdf_indexed", False)
 
     if request.method == "POST":
-        if "pdf" in request.files:
-            pdf = request.files["pdf"]
-            if pdf.filename:
-                reset_faiss_db()
-                path = upload_pdf(pdf)
-                docs = load_pdf(path)
-                chunks = create_chunks(docs)
-                build_faiss_db(chunks)
-                index_ready = True
-                flash("✅ PDF Indexed")
+        action = request.form.get("action")
 
-        q = request.form.get("question")
-        if q and index_ready:
-            docs = retrieve_docs(q)
-            answer = answer_query(docs, llm_model, q)
+        # PDF UPLOAD
+        if action == "upload":
+            pdf = request.files.get("pdf")
+            if not pdf or not pdf.filename.endswith(".pdf"):
+                flash("Invalid PDF")
+                return redirect(url_for("pdf_page"))
 
-        if request.form.get("summary") and index_ready:
-            docs = retrieve_all_docs()
-            summary = summarize_pdf(llm_model, docs)
+            reset_faiss_db()
+            path = os.path.join(UPLOAD_FOLDER, secure_filename(pdf.filename))
+            pdf.save(path)
 
-    return render_template("pdf.html", answer=answer, summary=summary)
+            docs = load_pdf(path)
+            chunks = create_chunks(docs)
+            build_faiss_db(chunks)
 
-@app.route("/pdf_chat", methods=["GET", "POST"])
-def pdf_chat():
-    if "pdf_history" not in session:
-        session["pdf_history"] = []
+            session["pdf_indexed"] = True
+            flash("PDF Indexed Successfully")
+            return redirect(url_for("pdf_page"))
 
-    if request.method == "POST":
-        # User asks question
-        if "question" in request.form:
-            user_q = request.form.get("question")
-            if user_q:
-                session["pdf_history"].append({"role": "user", "type": "text", "message": user_q})
+        # PDF QUESTION (✅ FIXED)
+        if action == "question":
+            question = request.form.get("question", "").strip()
 
-                if index_ready:
-                    docs = retrieve_docs(user_q)
-                    answer = answer_query(docs, llm_model, user_q)
-                    session["pdf_history"].append({"role": "bot", "type": "text", "message": answer})
-                else:
-                    session["pdf_history"].append({"role": "bot", "type": "text", "message": "❌ PDF not indexed yet."})
+            if not session.get("pdf_indexed"):
+                answer = "❌ Upload PDF first"
+            elif not question:
+                answer = "❌ Enter a question"
+            else:
+                try:
+                    docs = retrieve_docs(question)
+                    if not docs:
+                        answer = "❌ Answer not found in document"
+                    else:
+                        answer = answer_query(docs, llm_model, question)
+                except Exception as e:
+                    answer = f"❌ Error: {e}"
 
-                session.modified = True
-                return redirect(url_for("pdf_chat"))
-
-        # Summary request
-        if "summary" in request.form:
-            if index_ready:
+        # PDF SUMMARY
+        if action == "summary":
+            if not session.get("pdf_indexed"):
+                summary = "Upload PDF first"
+            else:
                 docs = retrieve_all_docs()
                 summary = summarize_pdf(llm_model, docs)
-                session["pdf_history"].append({"role": "bot", "type": "text", "message": summary})
-            else:
-                session["pdf_history"].append({"role": "bot", "type": "text", "message": "❌ PDF not indexed yet."})
-            session.modified = True
-            return redirect(url_for("pdf_chat"))
 
-    return render_template("pdf_chat.html", history=session["pdf_history"])
-    
+    return render_template("pdf.html", answer=answer, summary=summary, question=question)
 
 # =======================
 # RUN

@@ -235,9 +235,10 @@ body {
 
     .chat-container {
         width: 95%;        /* almost full width */
-        min-height: 400px; /* smaller min-height */
+        min-height: 500px; /* smaller min-height */
         max-height: 90vh;  /* prevent overflow */
         border-radius: 12px;
+        margin-top: 75px;
     }
 
     .messages {
@@ -287,7 +288,7 @@ body {
 
                     {% elif msg.type == "currency" %}
                         <div class="currency-box">
-                            💱 {{ msg.amount }} {{ msg.from }} → {{ msg.to }}<br>
+                            💱 {{ msg.amount }} {{ msg.from_currency }} → {{ msg.to_currency }}<br>
                             📈 Rate: {{ msg.rate }}<br>
                             ✅ Result: {{ msg.result }}
                         </div>

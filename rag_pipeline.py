@@ -1,3 +1,4 @@
+import os
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -10,19 +11,20 @@ from langchain_core.prompts import ChatPromptTemplate
 # -------------------------------
 llm_model = ChatGroq(
     model="llama-3.1-8b-instant",
-    temperature=0
+    temperature=0,
+    api_key=os.getenv("GROQ_API_KEY")
 )
 
 # -------------------------------
-# FAISS RETRIEVAL (🔥 FIXED)
+# FAISS RETRIEVAL
 # -------------------------------
 def retrieve_docs(query, k=5):
-    faiss_db = load_faiss_db()   # 🔥 LOAD FRESH
-    return faiss_db.similarity_search(query, k=k)
+    db = load_faiss_db()
+    return db.similarity_search(query, k=k)
 
 def retrieve_all_docs(k=15):
-    faiss_db = load_faiss_db()   # 🔥 LOAD FRESH
-    return faiss_db.similarity_search("", k=k)
+    db = load_faiss_db()
+    return db.similarity_search("", k=k)
 
 def get_context(documents):
     return "\n\n".join(doc.page_content for doc in documents)
@@ -48,7 +50,7 @@ Summarize the document clearly.
 
 Rules:
 - Only use provided context
-- Simple legal language
+- Simple language
 - Structured format
 
 Context:
@@ -56,6 +58,16 @@ Context:
 
 Summary:
 """
+
+# -------------------------------
+# SAFE RESPONSE HANDLER 🔥
+# -------------------------------
+def get_text(response):
+    if isinstance(response, str):
+        return response
+    if hasattr(response, "content"):
+        return response.content
+    return str(response)
 
 # -------------------------------
 # Q&A
@@ -74,7 +86,7 @@ def answer_query(documents, model, query):
         "context": context
     })
 
-    return response.content
+    return get_text(response)
 
 # -------------------------------
 # SUMMARY
@@ -89,4 +101,5 @@ def summarize_pdf(model, documents):
     chain = prompt | model
 
     response = chain.invoke({"context": context})
-    return response.content
+
+    return get_text(response)
